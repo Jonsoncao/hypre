@@ -7,18 +7,17 @@
 # terms of the GNU Lesser General Public License (as published by the Free
 # Software Foundation) version 2.1 dated February 1999.
 #
-# $Revision$
+# $Revision: 2.38 $
 #EHEADER**********************************************************************
 
-default: all
 
 # Include all variables defined by configure
 include config/Makefile.config
 
 # These are the directories for internal blas, lapack and general utilities
 HYPRE_BASIC_DIRS =\
- blas\
- lapack\
+ ${HYPRE_BLAS_SRC_DIR}\
+ ${HYPRE_LAPACK_SRC_DIR}\
  utilities
 
 #These are the directories for multivector
@@ -62,9 +61,6 @@ HYPRE_DOCS_DIRS = docs
 #This is the test-driver directory
 HYPRE_TEST_DIRS = test
 
-#This is the examples directory
-HYPRE_EXAMPLE_DIRS = examples
-
 # These are directories that are officially in HYPRE
 HYPRE_DIRS =\
  ${HYPRE_BASIC_DIRS}\
@@ -90,13 +86,13 @@ all:
 	@ \
 	mkdir -p ${HYPRE_BUILD_DIR}/include; \
 	mkdir -p ${HYPRE_BUILD_DIR}/lib; \
-	cp -fR HYPRE_config.h ${HYPRE_BUILD_DIR}/include/.; \
-	cp -fR $(srcdir)/HYPRE.h ${HYPRE_BUILD_DIR}/include/.; \
-	cp -fR $(srcdir)/HYPREf.h ${HYPRE_BUILD_DIR}/include/.; \
-	for i in ${HYPRE_DIRS}; \
+	cp -fpPR HYPRE_config.h ${HYPRE_BUILD_DIR}/include/.; \
+	cp -fpPR $(srcdir)/HYPRE.h ${HYPRE_BUILD_DIR}/include/.; \
+	cp -fpPR $(srcdir)/HYPREf.h ${HYPRE_BUILD_DIR}/include/.; \
+	for i in ${HYPRE_DIRS} ${HYPRE_BABEL_DIRS} ${HYPRE_EXAMPLE_DIRS}; \
 	do \
 	  echo "Making $$i ..."; \
-	  (cd $$i && $(MAKE) $@) || exit 1; \
+	  (cd $$i && $(MAKE) $@); \
 	  echo ""; \
 	done
 
@@ -141,16 +137,7 @@ help:
 	@echo "     "
 	@echo "check:"
 	@echo "     runs a small driver test to verify a working library"
-	@echo "     use CHECKRUN=<mpirun routine> if needed combined with"
-	@echo "     PARMS='-P px py pz' where px*py*pz must be number of"
-	@echo "     processes set in CHECKRUN"
-	@echo "     "
-	@echo "     "
-	@echo "checkpar:"
-	@echo "     runs several regression test to verify a working library."
-	@echo "     Use parameter CHECKRUN='<mpirun routine -n>' if needed."
-	@echo "     If CHECKRUN is not set, 'mpirun -np' is used."
-	@echo "     "
+	@echo "     use CHECKRUN=<mpirun routine> if needed"
 	@echo "     "
 	@echo "************************************************************"
 
@@ -163,27 +150,10 @@ check:
 	@ \
 	echo "Checking the library ..."; \
 	(cd test; $(MAKE) all); \
-	(cd test; $(CHECKRUN) ./ij $(PARMS) 2> ij.err); \
-	(cd test; $(CHECKRUN) ./struct $(PARMS) 2> struct.err); \
-	(cd test; cp -f TEST_sstruct/sstruct.in.default .; $(CHECKRUN) ./sstruct $(PARMS) 2> sstruct.err); \
+	(cd test; $(CHECKRUN) ij 2> ij.err); \
+	(cd test; $(CHECKRUN) struct 2> struct.err); \
+	(cd test; cp -f TEST_sstruct/sstruct.in.default .; $(CHECKRUN) sstruct 2> sstruct.err); \
 	(cd test; ls -l ij.err struct.err sstruct.err)
-
-checkpar:
-	@ \
-        echo "Checking the library ..."; \
-        (cd test; $(MAKE) all); \
-        echo "Testing IJ ..."; \
-        (cd test; ./runtest.sh -tol 1.e-06 -mpi "$(CHECKRUN)" TEST_ij/solvers.sh); \
-        (cd test; ./checktest.sh); \
-        (cd test; ./cleantest.sh); \
-        echo "Testing Struct ..."; \
-        (cd test; ./runtest.sh -tol 1.e-06 -mpi "$(CHECKRUN)" TEST_struct/solvers.sh); \
-        (cd test; ./checktest.sh); \
-        (cd test; ./cleantest.sh); \
-        echo "Testing SStruct ..."; \
-        (cd test; ./runtest.sh -tol 1.e-06 -mpi "$(CHECKRUN)" TEST_sstruct/solvers.sh); \
-        (cd test; ./checktest.sh); \
-        (cd test; ./cleantest.sh); 
 
 install: all
 	@ \
@@ -195,14 +165,14 @@ install: all
 	cd ${HYPRE_LIB_INSTALL};   HYPRE_TODIR=`pwd`; \
 	if [ "$$HYPRE_FROMDIR" != "$$HYPRE_TODIR" ]; \
 	then \
-	  cp -fR $$HYPRE_FROMDIR/* $$HYPRE_TODIR; \
+	  cp -fpPR $$HYPRE_FROMDIR/* $$HYPRE_TODIR; \
 	fi; \
 	cd ${HYPRE_BUILD_DIR}/include; HYPRE_FROMDIR=`pwd`; \
 	cd $$HYPRE_PWD; \
 	cd ${HYPRE_INC_INSTALL};       HYPRE_TODIR=`pwd`; \
 	if [ "$$HYPRE_FROMDIR" != "$$HYPRE_TODIR" ]; \
 	then \
-	  cp -fR $$HYPRE_FROMDIR/* $$HYPRE_TODIR; \
+	  cp -fpPR $$HYPRE_FROMDIR/* $$HYPRE_TODIR; \
 	fi; \
 	cd $$HYPRE_PWD; \
 	chmod -R a+rX,u+w,go-w ${HYPRE_LIB_INSTALL}; \
@@ -212,12 +182,12 @@ install: all
 clean:
 	@ \
 	rm -Rf hypre; \
-	for i in ${HYPRE_DIRS} ${HYPRE_EXTRA_DIRS} ${HYPRE_EXAMPLE_DIRS}; \
+	for i in ${HYPRE_DIRS} ${HYPRE_EXTRA_DIRS} ${HYPRE_BABEL_DIRS} ${HYPRE_EXAMPLE_DIRS}; \
 	do \
 	  if [ -f $$i/Makefile ]; \
 	  then \
 	    echo "Cleaning $$i ..."; \
-	    (cd $$i && $(MAKE) $@) || exit 1; \
+	    (cd $$i && $(MAKE) $@); \
 	  fi; \
 	done
 	rm -rf tca.map pchdir *inslog*
@@ -225,12 +195,12 @@ clean:
 distclean:
 	@ \
 	rm -Rf hypre; \
-	for i in ${HYPRE_DIRS} ${HYPRE_EXTRA_DIRS} ${HYPRE_EXAMPLE_DIRS} examples/docs; \
+	for i in ${HYPRE_DIRS} ${HYPRE_EXTRA_DIRS} ${HYPRE_BABEL_DIRS} ${HYPRE_EXAMPLE_DIRS}; \
 	do \
 	  if [ -d $$i ]; \
 	  then \
 	    echo "Dist-Cleaning $$i ..."; \
-	    (cd $$i && $(MAKE) $@) || exit 1; \
+	    (cd $$i && $(MAKE) $@); \
 	  fi; \
 	done
 	rm -rf tca.map pchdir *inslog*
